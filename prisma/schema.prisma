@@ -1,0 +1,203 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  CASHIER
+}
+
+enum SaleStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum PaymentStatus {
+  SUCCESS
+  FAILED
+}
+
+enum IdempotencyStatus {
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model Merchant {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  stores          Store[]
+  users           User[]
+  products        Product[]
+  sales           Sale[]
+  idempotencyKeys IdempotencyKey[]
+
+  @@map("merchants")
+}
+
+model Store {
+  id         String   @id @default(uuid()) @db.Uuid
+  merchantId String   @map("merchant_id") @db.Uuid
+  name       String
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  merchant        Merchant         @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  userStores      UserStore[]
+  inventories     Inventory[]
+  sales           Sale[]
+  idempotencyKeys IdempotencyKey[]
+
+  @@index([merchantId])
+  @@map("stores")
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  merchantId   String   @map("merchant_id") @db.Uuid
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         Role     @default(CASHIER)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  merchant        Merchant         @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  userStores      UserStore[]
+  sales           Sale[]
+  idempotencyKeys IdempotencyKey[]
+
+  @@index([merchantId])
+  @@map("users")
+}
+
+model UserStore {
+  userId  String @map("user_id") @db.Uuid
+  storeId String @map("store_id") @db.Uuid
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@id([userId, storeId])
+  @@map("user_stores")
+}
+
+model Product {
+  id         String   @id @default(uuid()) @db.Uuid
+  merchantId String   @map("merchant_id") @db.Uuid
+  sku        String
+  name       String
+  price      Decimal  @db.Decimal(10, 2)
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  merchant    Merchant    @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  inventories Inventory[]
+  saleItems   SaleItem[]
+
+  @@unique([merchantId, sku])
+  @@index([merchantId])
+  @@map("products")
+}
+
+model Inventory {
+  id        String   @id @default(uuid()) @db.Uuid
+  storeId   String   @map("store_id") @db.Uuid
+  productId String   @map("product_id") @db.Uuid
+  quantity  Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  store   Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, productId])
+  @@index([storeId, productId])
+  @@map("inventory")
+}
+
+model Sale {
+  id         String     @id @default(uuid()) @db.Uuid
+  merchantId String     @map("merchant_id") @db.Uuid
+  storeId    String     @map("store_id") @db.Uuid
+  userId     String     @map("user_id") @db.Uuid
+  subtotal   Decimal    @db.Decimal(10, 2)
+  total      Decimal    @db.Decimal(10, 2)
+  status     SaleStatus @default(PENDING)
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
+
+  merchant  Merchant   @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  store     Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  saleItems SaleItem[]
+  payments  Payment[]
+
+  @@index([merchantId])
+  @@index([storeId])
+  @@index([storeId, createdAt])
+  @@map("sales")
+}
+
+model SaleItem {
+  id        String   @id @default(uuid()) @db.Uuid
+  saleId    String   @map("sale_id") @db.Uuid
+  productId String   @map("product_id") @db.Uuid
+  quantity  Int
+  unitPrice Decimal  @map("unit_price") @db.Decimal(10, 2)
+  total     Decimal  @db.Decimal(10, 2)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  sale    Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([saleId])
+  @@map("sale_items")
+}
+
+model Payment {
+  id            String        @id @default(uuid()) @db.Uuid
+  saleId        String        @map("sale_id") @db.Uuid
+  provider      String
+  transactionId String        @map("transaction_id")
+  amount        Decimal       @db.Decimal(10, 2)
+  status        PaymentStatus
+  createdAt     DateTime      @default(now()) @map("created_at")
+
+  sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@index([saleId])
+  @@map("payments")
+}
+
+model IdempotencyKey {
+  id           String            @id @default(uuid()) @db.Uuid
+  merchantId   String            @map("merchant_id") @db.Uuid
+  storeId      String            @map("store_id") @db.Uuid
+  userId       String            @map("user_id") @db.Uuid
+  key          String
+  requestHash  String            @map("request_hash")
+  saleId       String?           @map("sale_id") @db.Uuid
+  responseBody String?           @map("response_body") @db.Text
+  status       IdempotencyStatus @default(PROCESSING)
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+
+  merchant Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  store    Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, key])
+  @@index([storeId, key])
+  @@map("idempotency_keys")
+}
