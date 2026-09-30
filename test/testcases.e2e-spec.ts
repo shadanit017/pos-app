@@ -325,5 +325,53 @@ describe('Multi-Tenant POS E2E Tests', () => {
       });
       expect(inv?.quantity).toBe(8);
     });
+
+    it('should reject request when using same idempotency key with a different payload', async () => {
+      const product = await prisma.product.create({
+        data: {
+          merchantId: merchantAId,
+          sku: `SKU-HASH-${Date.now()}`,
+          name: 'Hash Test Product',
+          price: 50.0,
+          isActive: true,
+        },
+      });
+
+      await prisma.inventory.create({
+        data: {
+          storeId: storeA1Id,
+          productId: product.id,
+          quantity: 10,
+        },
+      });
+
+      const idempotencyKey = `idempotency-key-diff-payload-${Date.now()}`;
+      const payload1 = {
+        items: [{ productId: product.id, quantity: 1 }],
+        payment: { simulate: 'SUCCESS' as const },
+      };
+      const payload2 = {
+        items: [{ productId: product.id, quantity: 2 }],
+        payment: { simulate: 'SUCCESS' as const },
+      };
+
+      // First request
+      await request(app.getHttpServer())
+        .post(`/api/stores/${storeA1Id}/sales`)
+        .set('Authorization', `Bearer ${tokenA}`)
+        .set('idempotency-key', idempotencyKey)
+        .send(payload1)
+        .expect(201);
+
+      // Second request with SAME idempotency key but DIFFERENT payload
+      const res = await request(app.getHttpServer())
+        .post(`/api/stores/${storeA1Id}/sales`)
+        .set('Authorization', `Bearer ${tokenA}`)
+        .set('idempotency-key', idempotencyKey)
+        .send(payload2)
+        .expect(409);
+
+      expect(res.body.message).toBe('Same idempotency key cannot be used with a different request');
+    });
   });
 });

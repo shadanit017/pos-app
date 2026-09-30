@@ -52,6 +52,11 @@ export class SalesService {
     });
 
     if (keyRecord) {
+      if (keyRecord.requestHash !== requestHash) {
+        throw new ConflictException(
+          'Same idempotency key cannot be used with a different request',
+        );
+      }
       if (keyRecord.status === 'COMPLETED' && keyRecord.responseBody) {
         return JSON.parse(keyRecord.responseBody);
       }
@@ -78,8 +83,15 @@ export class SalesService {
         const existing = await this.prisma.idempotencyKey.findUnique({
           where: { storeId_key: { storeId, key: idempotencyKey } },
         });
-        if (existing && existing.status === 'COMPLETED' && existing.responseBody) {
-          return JSON.parse(existing.responseBody);
+        if (existing) {
+          if (existing.requestHash !== requestHash) {
+            throw new ConflictException(
+              'Same idempotency key cannot be used with a different request',
+            );
+          }
+          if (existing.status === 'COMPLETED' && existing.responseBody) {
+            return JSON.parse(existing.responseBody);
+          }
         }
         throw new ConflictException('Concurrent idempotency request in progress');
       }
