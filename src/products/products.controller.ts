@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query, ParseUUIDPipe } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -34,14 +34,14 @@ export class ProductsController {
 
   @Get(':id')
   @Roles(Role.ADMIN, Role.MANAGER, Role.CASHIER)
-  async findOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+  async findOne(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.productsService.findOne(user.merchantId, id);
   }
 
   @Patch(':id')
   @Roles(Role.ADMIN, Role.MANAGER)
   async update(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() updateProductDto: UpdateProductDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
@@ -50,7 +50,7 @@ export class ProductsController {
 
   @Delete(':id')
   @Roles(Role.ADMIN, Role.MANAGER)
-  async remove(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+  async remove(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.productsService.remove(user.merchantId, id);
   }
 }

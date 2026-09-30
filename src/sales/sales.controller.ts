@@ -8,6 +8,7 @@ import {
   UseGuards,
   Query,
   BadRequestException,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { SalesService } from './sales.service';
 import { CreateSaleDto } from './dto/create-sale.dto';
@@ -27,7 +28,7 @@ export class SalesController {
   @Post()
   @Roles(Role.ADMIN, Role.MANAGER, Role.CASHIER)
   async create(
-    @Param('storeId') storeId: string,
+    @Param('storeId', ParseUUIDPipe) storeId: string,
     @Headers('idempotency-key') idempotencyKey: string,
     @Body() dto: CreateSaleDto,
     @CurrentUser() user: AuthenticatedUser,
@@ -41,7 +42,7 @@ export class SalesController {
   @Get()
   @Roles(Role.ADMIN, Role.MANAGER, Role.CASHIER)
   async findAll(
-    @Param('storeId') storeId: string,
+    @Param('storeId', ParseUUIDPipe) storeId: string,
     @CurrentUser() user: AuthenticatedUser,
     @Query() query: SaleQueryDto,
   ) {
@@ -51,8 +52,8 @@ export class SalesController {
   @Get(':saleId')
   @Roles(Role.ADMIN, Role.MANAGER, Role.CASHIER)
   async findOne(
-    @Param('storeId') storeId: string,
-    @Param('saleId') saleId: string,
+    @Param('storeId', ParseUUIDPipe) storeId: string,
+    @Param('saleId', ParseUUIDPipe) saleId: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.salesService.findOne(user.merchantId, storeId, saleId);

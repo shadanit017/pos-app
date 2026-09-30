@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, UseGuards, ParseUUIDPipe } from '@nestjs/common';
 import { InventoryService } from './inventory.service';
 import { CreateInventoryDto } from './dto/create-inventory.dto';
 import { UpdateInventoryDto } from './dto/update-inventory.dto';
@@ -17,7 +17,7 @@ export class InventoryController {
   @Post()
   @Roles(Role.ADMIN, Role.MANAGER)
   async createOrUpdate(
-    @Param('storeId') storeId: string,
+    @Param('storeId', ParseUUIDPipe) storeId: string,
     @Body() dto: CreateInventoryDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
@@ -27,7 +27,7 @@ export class InventoryController {
   @Get()
   @Roles(Role.ADMIN, Role.MANAGER, Role.CASHIER)
   async findAll(
-    @Param('storeId') storeId: string,
+    @Param('storeId', ParseUUIDPipe) storeId: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.inventoryService.getStoreInventory(user.merchantId, storeId);
@@ -36,8 +36,8 @@ export class InventoryController {
   @Get(':productId')
   @Roles(Role.ADMIN, Role.MANAGER, Role.CASHIER)
   async findOne(
-    @Param('storeId') storeId: string,
-    @Param('productId') productId: string,
+    @Param('storeId', ParseUUIDPipe) storeId: string,
+    @Param('productId', ParseUUIDPipe) productId: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.inventoryService.getProductInventory(user.merchantId, storeId, productId);
@@ -46,8 +46,8 @@ export class InventoryController {
   @Patch(':productId')
   @Roles(Role.ADMIN, Role.MANAGER)
   async update(
-    @Param('storeId') storeId: string,
-    @Param('productId') productId: string,
+    @Param('storeId', ParseUUIDPipe) storeId: string,
+    @Param('productId', ParseUUIDPipe) productId: string,
     @Body() dto: UpdateInventoryDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
